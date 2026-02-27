@@ -18,7 +18,7 @@ export const metadata: Metadata = {
   title: "Vislet | Expense Insight Dashboard",
   description: "Expense tracking with visualization-first insights.",
   icons: {
-    icon: "/convex.svg",
+    icon: "/wallet.svg",
   },
 };
 
