@@ -59,17 +59,28 @@ export default function TransactionsPage() {
 
   const [draftNames, setDraftNames] = useState<Record<string, string>>({});
   const [draftAmounts, setDraftAmounts] = useState<Record<string, string>>({});
-  const [savingId, setSavingId] = useState<string | null>(null);
-  const [editingAmountId, setEditingAmountId] = useState<string | null>(null);
-  const [savingAmountId, setSavingAmountId] = useState<string | null>(null);
-  const [switchingTypeId, setSwitchingTypeId] = useState<string | null>(null);
-  const [switchingAccountId, setSwitchingAccountId] = useState<string | null>(
+  const [editingNameId, setEditingNameId] = useState<Id<"transactions"> | null>(
     null,
   );
-  const [switchingCategoryId, setSwitchingCategoryId] = useState<string | null>(
+  const [savingNameId, setSavingNameId] = useState<Id<"transactions"> | null>(
     null,
   );
-  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [editingAmountId, setEditingAmountId] = useState<Id<"transactions"> | null>(
+    null,
+  );
+  const [savingAmountId, setSavingAmountId] = useState<Id<"transactions"> | null>(
+    null,
+  );
+  const [switchingTypeId, setSwitchingTypeId] = useState<Id<"transactions"> | null>(
+    null,
+  );
+  const [switchingAccountId, setSwitchingAccountId] = useState<
+    Id<"transactions"> | null
+  >(null);
+  const [switchingCategoryId, setSwitchingCategoryId] = useState<
+    Id<"transactions"> | null
+  >(null);
+  const [deletingId, setDeletingId] = useState<Id<"transactions"> | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const transactionRows = useMemo(() => transactions ?? [], [transactions]);
@@ -86,14 +97,44 @@ export default function TransactionsPage() {
     }
   };
 
-  const onRename = async (transactionId: Id<"transactions">, currentName: string) => {
-    const draftName = draftNames[transactionId]?.trim();
+  const onStartNameEdit = (
+    transactionId: Id<"transactions">,
+    currentName: string,
+  ) => {
+    setEditingNameId(transactionId);
+    setErrorMessage(null);
+    setDraftNames((previous) => ({
+      ...previous,
+      [transactionId]: currentName,
+    }));
+  };
 
-    if (!draftName || draftName === currentName) {
+  const onCancelNameEdit = (transactionId: Id<"transactions">) => {
+    setEditingNameId((previous) => (previous === transactionId ? null : previous));
+    setDraftNames((previous) => {
+      const next = { ...previous };
+      delete next[transactionId];
+      return next;
+    });
+  };
+
+  const onSaveName = async (
+    transactionId: Id<"transactions">,
+    currentName: string,
+  ) => {
+    const draftName = draftNames[transactionId]?.trim() ?? "";
+
+    if (!draftName) {
+      setErrorMessage("Name cannot be empty.");
       return;
     }
 
-    setSavingId(transactionId);
+    if (draftName === currentName) {
+      onCancelNameEdit(transactionId);
+      return;
+    }
+
+    setSavingNameId(transactionId);
     setErrorMessage(null);
 
     try {
@@ -101,10 +142,11 @@ export default function TransactionsPage() {
         name: draftName,
         transactionId,
       });
+      onCancelNameEdit(transactionId);
     } catch {
       setErrorMessage("Could not rename the transaction. Please try again.");
     } finally {
-      setSavingId(null);
+      setSavingNameId(null);
     }
   };
 
@@ -317,9 +359,8 @@ export default function TransactionsPage() {
               </TableHeader>
               <TableBody>
                 {transactionRows.map((transaction) => {
-                  const draftName =
-                    draftNames[transaction._id] ?? transaction.name;
-                  const isSaving = savingId === transaction._id;
+                  const isEditingName = editingNameId === transaction._id;
+                  const isSavingName = savingNameId === transaction._id;
                   const isEditingAmount = editingAmountId === transaction._id;
                   const isSavingAmount = savingAmountId === transaction._id;
                   const isSwitchingType = switchingTypeId === transaction._id;
@@ -336,6 +377,9 @@ export default function TransactionsPage() {
                   const draftAmountValue =
                     draftAmounts[transaction._id] ??
                     Math.abs(transaction.amount).toString();
+                  const draftNameValue =
+                    draftNames[transaction._id] ?? transaction.name;
+                  const trimmedDraftName = draftNameValue.trim();
                   const trimmedDraftAmount = draftAmountValue.trim();
                   const parsedDraftAmount = Number(trimmedDraftAmount);
                   const isDraftAmountValid =
@@ -348,16 +392,10 @@ export default function TransactionsPage() {
                     !isSavingAmount &&
                     isDraftAmountValid &&
                     nextSignedAmount !== transaction.amount;
-                  const canSave =
-                    draftName.trim().length > 0 &&
-                    draftName.trim() !== transaction.name &&
-                    !isSaving &&
-                    !isDeleting &&
-                    !isEditingAmount &&
-                    !isSavingAmount &&
-                    !isSwitchingType &&
-                    !isSwitchingAccount &&
-                    !isSwitchingCategory;
+                  const canSaveName =
+                    !isSavingName &&
+                    trimmedDraftName.length > 0 &&
+                    trimmedDraftName !== transaction.name;
 
                   return (
                     <TableRow key={transaction._id}>
@@ -374,12 +412,13 @@ export default function TransactionsPage() {
                           <MenuPopup align="start">
                             <MenuItem
                               disabled={
+                                isEditingName ||
+                                isSavingName ||
                                 isEditingAmount ||
                                 isSavingAmount ||
                                 isSwitchingType ||
                                 isSwitchingAccount ||
                                 isSwitchingCategory ||
-                                isSaving ||
                                 isDeleting
                               }
                               onClick={() =>
@@ -438,7 +477,8 @@ export default function TransactionsPage() {
                             <Button
                               aria-label={`Edit amount for ${transaction._id}`}
                               disabled={
-                                isSaving ||
+                                isEditingName ||
+                                isSavingName ||
                                 isSavingAmount ||
                                 isSwitchingType ||
                                 isSwitchingAccount ||
@@ -475,12 +515,13 @@ export default function TransactionsPage() {
                                 return (
                                   <MenuItem
                                     disabled={
+                                      isEditingName ||
+                                      isSavingName ||
                                       isEditingAmount ||
                                       isSavingAmount ||
                                       isSwitchingAccount ||
                                       isSwitchingCategory ||
                                       isSwitchingType ||
-                                      isSaving ||
                                       isDeleting ||
                                       isCurrentAccount
                                     }
@@ -519,12 +560,13 @@ export default function TransactionsPage() {
                                 return (
                                   <MenuItem
                                     disabled={
+                                      isEditingName ||
+                                      isSavingName ||
                                       isEditingAmount ||
                                       isSavingAmount ||
                                       isSwitchingAccount ||
                                       isSwitchingCategory ||
                                       isSwitchingType ||
-                                      isSaving ||
                                       isDeleting ||
                                       isCurrentCategory
                                     }
@@ -546,16 +588,62 @@ export default function TransactionsPage() {
                         </Menu>
                       </TableCell>
                       <TableCell className="w-[22%] min-w-[220px]">
-                        <Input
-                          aria-label={`Name for ${transaction._id}`}
-                          onChange={(event) =>
-                            setDraftNames((previous) => ({
-                              ...previous,
-                              [transaction._id]: event.target.value,
-                            }))
-                          }
-                          value={draftName}
-                        />
+                        {isEditingName ? (
+                          <div className="flex items-center gap-2">
+                            <Input
+                              aria-label={`Name for ${transaction._id}`}
+                              disabled={isSavingName}
+                              onChange={(event) =>
+                                setDraftNames((previous) => ({
+                                  ...previous,
+                                  [transaction._id]: event.target.value,
+                                }))
+                              }
+                              value={draftNameValue}
+                            />
+                            <Button
+                              disabled={!canSaveName}
+                              onClick={() =>
+                                onSaveName(transaction._id, transaction.name)
+                              }
+                              size="xs"
+                              variant="outline"
+                            >
+                              {isSavingName ? "Saving..." : "Save"}
+                            </Button>
+                            <Button
+                              disabled={isSavingName}
+                              onClick={() => onCancelNameEdit(transaction._id)}
+                              size="xs"
+                              variant="outline"
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <span>{transaction.name}</span>
+                            <Button
+                              aria-label={`Edit name for ${transaction._id}`}
+                              disabled={
+                                isSavingName ||
+                                isEditingAmount ||
+                                isSavingAmount ||
+                                isSwitchingType ||
+                                isSwitchingAccount ||
+                                isSwitchingCategory ||
+                                isDeleting
+                              }
+                              onClick={() =>
+                                onStartNameEdit(transaction._id, transaction.name)
+                              }
+                              size="icon-xs"
+                              variant="ghost"
+                            >
+                              <PencilIcon />
+                            </Button>
+                          </div>
+                        )}
                       </TableCell>
                       <TableCell>
                         {formatPurchaseDate(transaction.purchaseDate)}
@@ -563,19 +651,10 @@ export default function TransactionsPage() {
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-2">
                           <Button
-                            disabled={!canSave}
-                            onClick={() =>
-                              onRename(transaction._id, transaction.name)
-                            }
-                            size="sm"
-                            variant="outline"
-                          >
-                            {isSaving ? "Saving..." : "Save name"}
-                          </Button>
-                          <Button
                             disabled={
                               isDeleting ||
-                              isSaving ||
+                              isSavingName ||
+                              isEditingName ||
                               isEditingAmount ||
                               isSavingAmount ||
                               isSwitchingType ||
