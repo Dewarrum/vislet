@@ -1,25 +1,26 @@
-import { auth, currentUser } from "@clerk/nextjs/server";
-import { redirect } from "next/navigation";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
-export default async function DashboardPage() {
-  const { userId } = await auth();
-
-  if (!userId) {
-    redirect("/");
-  }
-
-  const user = await currentUser();
-  const userName =
-    user?.firstName ??
-    user?.username ??
-    user?.emailAddresses[0]?.emailAddress ??
-    "User";
-
+export default function DashboardPage() {
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-5xl items-center justify-center px-6 py-10">
-      <h1 className="text-4xl font-semibold tracking-tight text-slate-900">
-        Hello {userName}!
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-4">
+      <h1 className="text-3xl font-semibold tracking-tight text-slate-900">
+        Dashboard overview
       </h1>
-    </main>
+      <Card>
+        <CardHeader>
+          <CardTitle>Bank accounts</CardTitle>
+          <CardDescription>
+            Manage and review your connected bank accounts.
+          </CardDescription>
+          <div className="pt-2">
+            <Button render={<Link href="/dashboard/bank-accounts" />}>
+              Open bank accounts
+            </Button>
+          </div>
+        </CardHeader>
+      </Card>
+    </div>
   );
 }
