@@ -13,15 +13,27 @@ async function requireUserId(ctx: QueryCtx | MutationCtx) {
 }
 
 export const listForCurrentUser = query({
-  args: {},
-  handler: async (ctx) => {
+  args: {
+    searchText: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
+    const trimmedSearchText = args.searchText?.trim();
+
+    if (!trimmedSearchText) {
+      return await ctx.db
+        .query("categories")
+        .withIndex("by_userId_and_createdAt", (q) => q.eq("userId", userId))
+        .order("desc")
+        .collect();
+    }
 
     return await ctx.db
       .query("categories")
-      .withIndex("by_userId_and_createdAt", (q) => q.eq("userId", userId))
-      .order("desc")
-      .collect();
+      .withSearchIndex("search_name", (q) =>
+        q.search("name", trimmedSearchText).eq("userId", userId),
+      )
+      .take(50);
   },
 });
 

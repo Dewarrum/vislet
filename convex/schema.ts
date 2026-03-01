@@ -16,7 +16,12 @@ export default defineSchema({
     createdAt: v.number(),
     name: v.string(),
     userId: v.string(),
-  }).index("by_userId_and_createdAt", ["userId", "createdAt"]),
+  })
+    .index("by_userId_and_createdAt", ["userId", "createdAt"])
+    .searchIndex("search_name", {
+      filterFields: ["userId"],
+      searchField: "name",
+    }),
   numbers: defineTable({
     value: v.number(),
   }),

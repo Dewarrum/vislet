@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,7 +25,21 @@ function formatCreatedAt(createdAt: number) {
 }
 
 export default function CategoriesPage() {
-  const categories = useQuery(api.categories.listForCurrentUser);
+  const [searchText, setSearchText] = useState("");
+  const [debouncedSearchText, setDebouncedSearchText] = useState("");
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      setDebouncedSearchText(searchText);
+    }, 100);
+
+    return () => clearTimeout(timeoutId);
+  }, [searchText]);
+
+  const trimmedSearchText = debouncedSearchText.trim();
+  const categories = useQuery(api.categories.listForCurrentUser, {
+    searchText: trimmedSearchText.length > 0 ? trimmedSearchText : undefined,
+  });
   const createCategory = useMutation(api.categories.create);
   const renameCategory = useMutation(api.categories.rename);
   const removeCategory = useMutation(api.categories.remove);
@@ -148,11 +162,25 @@ export default function CategoriesPage() {
           </CardDescription>
         </CardHeader>
 
-        <div className="px-6 pb-6">
+        <div className="space-y-4 px-6 pb-6">
+          <div className="space-y-2">
+            <Label htmlFor="category-search">Search</Label>
+            <Input
+              id="category-search"
+              onChange={(event) => setSearchText(event.target.value)}
+              placeholder="Find categories by name"
+              value={searchText}
+            />
+          </div>
+
           {categories === undefined ? (
             <p className="text-sm text-slate-600">Loading categories...</p>
           ) : categoryRows.length === 0 ? (
-            <p className="text-sm text-slate-600">No categories found yet.</p>
+            <p className="text-sm text-slate-600">
+              {trimmedSearchText.length > 0
+                ? "No categories match your search."
+                : "No categories found yet."}
+            </p>
           ) : (
             <Table>
               <TableHeader>
