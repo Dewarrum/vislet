@@ -34,6 +34,22 @@ export default function DashboardPage() {
           </div>
         </CardHeader>
       </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>Transactions</CardTitle>
+          <CardDescription>
+            Track transaction activity and maintain transaction names.
+          </CardDescription>
+          <div className="pt-2">
+            <Button
+              render={<Link href="/dashboard/transactions" />}
+              variant="outline"
+            >
+              Open transactions
+            </Button>
+          </div>
+        </CardHeader>
+      </Card>
     </div>
   );
 }

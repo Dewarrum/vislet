@@ -22,6 +22,19 @@ export default defineSchema({
       filterFields: ["userId"],
       searchField: "name",
     }),
+  transactions: defineTable({
+    accountId: v.id("bankAccounts"),
+    amount: v.number(),
+    categoryId: v.id("categories"),
+    createdAt: v.number(),
+    name: v.string(),
+    purchaseDate: v.number(),
+    userId: v.string(),
+  }).index("by_userId_and_purchaseDate_createdAt", [
+    "userId",
+    "purchaseDate",
+    "createdAt",
+  ]),
   numbers: defineTable({
     value: v.number(),
   }),

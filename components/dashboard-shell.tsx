@@ -2,7 +2,12 @@
 
 import Link from "next/link";
 import { UserButton } from "@clerk/nextjs";
-import { Building2Icon, LayoutDashboardIcon, TagsIcon } from "lucide-react";
+import {
+  Building2Icon,
+  LayoutDashboardIcon,
+  ReceiptTextIcon,
+  TagsIcon,
+} from "lucide-react";
 import { usePathname } from "next/navigation";
 import {
   Sidebar,
@@ -35,6 +40,11 @@ const navItems = [
     href: "/dashboard/categories",
     icon: TagsIcon,
     label: "Categories",
+  },
+  {
+    href: "/dashboard/transactions",
+    icon: ReceiptTextIcon,
+    label: "Transactions",
   },
 ];
 

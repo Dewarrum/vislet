@@ -11,6 +11,7 @@
 import type * as bankAccounts from "../bankAccounts.js";
 import type * as categories from "../categories.js";
 import type * as myFunctions from "../myFunctions.js";
+import type * as transactions from "../transactions.js";
 
 import type {
   ApiFromModules,
@@ -22,6 +23,7 @@ declare const fullApi: ApiFromModules<{
   bankAccounts: typeof bankAccounts;
   categories: typeof categories;
   myFunctions: typeof myFunctions;
+  transactions: typeof transactions;
 }>;
 
 /**
