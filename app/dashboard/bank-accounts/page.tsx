@@ -2,11 +2,12 @@
 
 import { useMemo, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
+import { CreateBankAccountDialog } from "@/components/create-bank-account-dialog";
+import type { CreateBankAccountInput } from "@/components/create-bank-account-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Table,
   TableBody,
@@ -33,9 +34,6 @@ export default function BankAccountsPage() {
   const removeBankAccount = useMutation(api.bankAccounts.remove);
 
   const [draftNames, setDraftNames] = useState<Record<string, string>>({});
-  const [newName, setNewName] = useState("");
-  const [newCurrency, setNewCurrency] = useState("USD");
-  const [isCreating, setIsCreating] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [settingDefaultId, setSettingDefaultId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -65,34 +63,14 @@ export default function BankAccountsPage() {
     }
   };
 
-  const onCreate = async () => {
-    const trimmedName = newName.trim();
-    const normalizedCurrency = newCurrency.trim().toUpperCase();
-
-    if (!trimmedName) {
-      setErrorMessage("Bank account name is required.");
-      return;
-    }
-
-    if (!/^[A-Z]{3}$/.test(normalizedCurrency)) {
-      setErrorMessage("Currency must be a 3-letter code, such as USD.");
-      return;
-    }
-
-    setIsCreating(true);
+  const onCreate = async (input: CreateBankAccountInput) => {
     setErrorMessage(null);
 
     try {
-      await createBankAccount({
-        currency: normalizedCurrency,
-        name: trimmedName,
-      });
-      setNewName("");
-      setNewCurrency(normalizedCurrency);
+      await createBankAccount(input);
     } catch {
       setErrorMessage("Could not create the bank account. Please try again.");
-    } finally {
-      setIsCreating(false);
+      throw new Error("Could not create the bank account. Please try again.");
     }
   };
 
@@ -137,49 +115,17 @@ export default function BankAccountsPage() {
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-4">
-      <div>
-        <h1 className="text-3xl font-semibold tracking-tight text-slate-900">
-          Bank accounts
-        </h1>
-        <p className="mt-1 text-sm text-slate-600">
-          Review your accounts and update account names.
-        </p>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Create a bank account</CardTitle>
-          <CardDescription>
-            Add a new account by setting a name and currency.
-          </CardDescription>
-        </CardHeader>
-        <div className="grid gap-3 px-6 pb-6 sm:grid-cols-[1fr_140px_auto] sm:items-end">
-          <div className="space-y-2">
-            <Label htmlFor="new-bank-account-name">Name</Label>
-            <Input
-              id="new-bank-account-name"
-              onChange={(event) => setNewName(event.target.value)}
-              placeholder="Primary checking"
-              value={newName}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="new-bank-account-currency">Currency</Label>
-            <Input
-              id="new-bank-account-currency"
-              maxLength={3}
-              onChange={(event) =>
-                setNewCurrency(event.target.value.toUpperCase())
-              }
-              placeholder="USD"
-              value={newCurrency}
-            />
-          </div>
-          <Button disabled={isCreating} onClick={onCreate}>
-            {isCreating ? "Creating..." : "Create account"}
-          </Button>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-3xl font-semibold tracking-tight text-slate-900">
+            Bank accounts
+          </h1>
+          <p className="mt-1 text-sm text-slate-600">
+            Review your accounts and update account names.
+          </p>
         </div>
-      </Card>
+        <CreateBankAccountDialog onCreate={onCreate} />
+      </div>
 
       <Card>
         <CardHeader>

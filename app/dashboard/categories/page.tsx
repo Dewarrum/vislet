@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
+import { CreateCategoryDialog } from "@/components/create-category-dialog";
+import type { CreateCategoryInput } from "@/components/create-category-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -44,33 +46,21 @@ export default function CategoriesPage() {
   const renameCategory = useMutation(api.categories.rename);
   const removeCategory = useMutation(api.categories.remove);
 
-  const [newName, setNewName] = useState("");
   const [draftNames, setDraftNames] = useState<Record<string, string>>({});
-  const [isCreating, setIsCreating] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const categoryRows = useMemo(() => categories ?? [], [categories]);
 
-  const onCreate = async () => {
-    const trimmedName = newName.trim();
-
-    if (!trimmedName) {
-      setErrorMessage("Category name is required.");
-      return;
-    }
-
-    setIsCreating(true);
+  const onCreate = async (input: CreateCategoryInput) => {
     setErrorMessage(null);
 
     try {
-      await createCategory({ name: trimmedName });
-      setNewName("");
+      await createCategory(input);
     } catch {
       setErrorMessage("Could not create the category. Please try again.");
-    } finally {
-      setIsCreating(false);
+      throw new Error("Could not create the category. Please try again.");
     }
   };
 
@@ -124,35 +114,17 @@ export default function CategoriesPage() {
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-4">
-      <div>
-        <h1 className="text-3xl font-semibold tracking-tight text-slate-900">
-          Categories
-        </h1>
-        <p className="mt-1 text-sm text-slate-600">
-          Create and manage your expense categories.
-        </p>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Create a category</CardTitle>
-          <CardDescription>Add a new category by name.</CardDescription>
-        </CardHeader>
-        <div className="grid gap-3 px-6 pb-6 sm:grid-cols-[1fr_auto] sm:items-end">
-          <div className="space-y-2">
-            <Label htmlFor="new-category-name">Name</Label>
-            <Input
-              id="new-category-name"
-              onChange={(event) => setNewName(event.target.value)}
-              placeholder="Groceries"
-              value={newName}
-            />
-          </div>
-          <Button disabled={isCreating} onClick={onCreate}>
-            {isCreating ? "Creating..." : "Create category"}
-          </Button>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-3xl font-semibold tracking-tight text-slate-900">
+            Categories
+          </h1>
+          <p className="mt-1 text-sm text-slate-600">
+            Create and manage your expense categories.
+          </p>
         </div>
-      </Card>
+        <CreateCategoryDialog onCreate={onCreate} />
+      </div>
 
       <Card>
         <CardHeader>
