@@ -22,15 +22,6 @@ import {
   MenuSeparator,
   MenuTrigger,
 } from "@/components/ui/menu";
-import {
-  Select,
-  SelectItem,
-  SelectPopup,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-
-const MONTH_RANGE_OPTIONS = [3, 6, 9, 12] as const;
 
 export default function DashboardPage() {
   const accounts = useQuery(api.bankAccounts.listForCurrentUser);
@@ -38,7 +29,6 @@ export default function DashboardPage() {
   const [selectedAccountIds, setSelectedAccountIds] = useState<
     Array<Id<"bankAccounts">>
   >([]);
-  const [monthRange, setMonthRange] = useState<number>(6);
 
   const accountIds = useMemo(
     () => accountOptions.map((account) => account._id),
@@ -234,35 +224,9 @@ export default function DashboardPage() {
             </MenuPopup>
           </Menu>
         </div>
-        <div className="w-[180px] space-y-1">
-          <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-            Date range
-          </p>
-          <Select
-            onValueChange={(value) => setMonthRange(Number(value))}
-            value={`Last ${monthRange} months`}
-          >
-            <SelectTrigger size="sm">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectPopup>
-              {MONTH_RANGE_OPTIONS.map((option) => (
-                <SelectItem key={option} value={option.toString()}>
-                  Last {option} months
-                </SelectItem>
-              ))}
-            </SelectPopup>
-          </Select>
-        </div>
       </div>
-      <ExpenseBreakdownPieCard
-        monthRange={monthRange}
-        selectedAccountIds={effectiveSelectedAccountIds}
-      />
-      <MonthlyExpensesBarCard
-        monthRange={monthRange}
-        selectedAccountIds={effectiveSelectedAccountIds}
-      />
+      <ExpenseBreakdownPieCard selectedAccountIds={effectiveSelectedAccountIds} />
+      <MonthlyExpensesBarCard selectedAccountIds={effectiveSelectedAccountIds} />
       <Card>
         <CardHeader>
           <CardTitle>Bank accounts</CardTitle>

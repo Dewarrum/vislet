@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "convex/react";
 import {
   Bar,
@@ -15,11 +15,20 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import {
   Card,
+  CardAction,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Select,
+  SelectItem,
+  SelectPopup,
+  SelectTrigger,
+} from "@/components/ui/select";
+
+const MONTH_RANGE_OPTIONS = [3, 6, 9, 12] as const;
 
 function formatAmount(amount: number) {
   return new Intl.NumberFormat("en-US", {
@@ -33,14 +42,13 @@ const yAxisFormatter = new Intl.NumberFormat("en-US", {
 });
 
 type MonthlyExpensesBarCardProps = {
-  monthRange: number;
   selectedAccountIds: Array<Id<"bankAccounts">>;
 };
 
 export default function MonthlyExpensesBarCard({
-  monthRange,
   selectedAccountIds,
 }: MonthlyExpensesBarCardProps) {
+  const [monthRange, setMonthRange] = useState<number>(6);
   const queryArgs = useMemo(
     () => ({
       accountIds: selectedAccountIds,
@@ -53,10 +61,6 @@ export default function MonthlyExpensesBarCard({
     queryArgs,
   );
   const chartData = useMemo(() => monthlyExpenses ?? [], [monthlyExpenses]);
-  const totalSpent = useMemo(
-    () => chartData.reduce((sum, row) => sum + row.totalAmount, 0),
-    [chartData],
-  );
   const hasSpending = useMemo(
     () => chartData.some((row) => row.totalAmount > 0),
     [chartData],
@@ -69,6 +73,23 @@ export default function MonthlyExpensesBarCard({
         <CardDescription>
           Amount spent each month for the selected range.
         </CardDescription>
+        <CardAction className="w-[180px]">
+          <Select
+            onValueChange={(value) => setMonthRange(Number(value))}
+            value={monthRange.toString()}
+          >
+            <SelectTrigger size="sm">
+              Last {monthRange} months
+            </SelectTrigger>
+            <SelectPopup>
+              {MONTH_RANGE_OPTIONS.map((option) => (
+                <SelectItem key={option} value={option.toString()}>
+                  Last {option} months
+                </SelectItem>
+              ))}
+            </SelectPopup>
+          </Select>
+        </CardAction>
       </CardHeader>
       <CardContent>
         {monthlyExpenses === undefined ? (
@@ -78,32 +99,25 @@ export default function MonthlyExpensesBarCard({
             No expense transactions found in this date range.
           </p>
         ) : (
-          <div className="space-y-4">
-            <div className="h-[300px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} margin={{ left: 8, right: 8, top: 8 }}>
-                  <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" />
-                  <XAxis dataKey="monthLabel" />
-                  <YAxis tickFormatter={(value: number) => yAxisFormatter.format(value)} />
-                  <Tooltip
-                    formatter={(value: number | undefined) =>
-                      formatAmount(value ?? 0)
-                    }
-                    separator=": "
-                  />
-                  <Bar dataKey="totalAmount" fill="#0ea5e9" radius={[6, 6, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-
-            <div className="rounded-lg border bg-slate-50 px-3 py-2">
-              <p className="text-xs uppercase tracking-wide text-slate-500">
-                Total spend ({monthRange} months)
-              </p>
-              <p className="text-lg font-semibold text-slate-900">
-                {formatAmount(totalSpent)}
-              </p>
-            </div>
+          <div className="h-[300px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData} margin={{ left: 20, right: 8, top: 8 }}>
+                <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" />
+                <XAxis dataKey="monthLabel" />
+                <YAxis
+                  tickFormatter={(value: number) => yAxisFormatter.format(value)}
+                  tickMargin={8}
+                  width={90}
+                />
+                <Tooltip
+                  formatter={(value: number | undefined) =>
+                    formatAmount(value ?? 0)
+                  }
+                  separator=": "
+                />
+                <Bar dataKey="totalAmount" fill="#0ea5e9" radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
           </div>
         )}
       </CardContent>

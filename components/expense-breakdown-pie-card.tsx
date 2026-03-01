@@ -1,17 +1,24 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "convex/react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import {
   Card,
+  CardAction,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Select,
+  SelectItem,
+  SelectPopup,
+  SelectTrigger,
+} from "@/components/ui/select";
 
 const CHART_COLORS = [
   "#0ea5e9",
@@ -31,21 +38,78 @@ function formatAmount(amount: number) {
   }).format(amount);
 }
 
+function getCurrentMonthStart() {
+  const now = new Date();
+
+  return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1);
+}
+
+function getNextMonthStart(monthStart: number) {
+  const date = new Date(monthStart);
+
+  return Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 1);
+}
+
+function toIsoDate(monthStart: number) {
+  const date = new Date(monthStart);
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
 type ExpenseBreakdownPieCardProps = {
-  monthRange: number;
   selectedAccountIds: Array<Id<"bankAccounts">>;
 };
 
 export default function ExpenseBreakdownPieCard({
-  monthRange,
   selectedAccountIds,
 }: ExpenseBreakdownPieCardProps) {
+  const [selectedMonthStart, setSelectedMonthStart] = useState<number>(
+    getCurrentMonthStart,
+  );
+  const monthOptions = useMemo(() => {
+    const now = new Date();
+    const monthLabelFormatter = new Intl.DateTimeFormat("en-US", {
+      month: "long",
+      timeZone: "UTC",
+      year: "numeric",
+    });
+
+    return Array.from({ length: 12 }, (_, index) => {
+      const monthStart = Date.UTC(
+        now.getUTCFullYear(),
+        now.getUTCMonth() - index,
+        1,
+      );
+
+      return {
+        monthLabel:
+          index === 0
+            ? "Current month"
+            : index === 1
+              ? "Previous month"
+              : monthLabelFormatter.format(monthStart),
+        monthStart,
+      };
+    });
+  }, []);
+  const selectedMonthLabel = useMemo(
+    () =>
+      monthOptions.find((option) => option.monthStart === selectedMonthStart)
+        ?.monthLabel ?? "Select month",
+    [monthOptions, selectedMonthStart],
+  );
   const queryArgs = useMemo(
     () => ({
       accountIds: selectedAccountIds,
-      monthCount: monthRange,
+      monthRange: {
+        end: toIsoDate(getNextMonthStart(selectedMonthStart)),
+        start: toIsoDate(selectedMonthStart),
+      },
     }),
-    [monthRange, selectedAccountIds],
+    [selectedAccountIds, selectedMonthStart],
   );
   const expenseBreakdown = useQuery(
     api.transactions.expenseBreakdownByCategory,
@@ -74,16 +138,35 @@ export default function ExpenseBreakdownPieCard({
         <CardTitle>Expenses by category</CardTitle>
         <CardDescription>
           Expense totals are grouped by category using absolute transaction
-          amounts and filtered by the shared dashboard account and date-range
-          filters.
+          amounts and filtered by the shared account filter and selected month.
         </CardDescription>
+        <CardAction className="w-[190px]">
+          <Select
+            onValueChange={(value) => setSelectedMonthStart(Number(value))}
+            value={selectedMonthStart.toString()}
+          >
+            <SelectTrigger size="sm">
+              {selectedMonthLabel}
+            </SelectTrigger>
+            <SelectPopup>
+              {monthOptions.map((option) => (
+                <SelectItem
+                  key={option.monthStart}
+                  value={option.monthStart.toString()}
+                >
+                  {option.monthLabel}
+                </SelectItem>
+              ))}
+            </SelectPopup>
+          </Select>
+        </CardAction>
       </CardHeader>
       <CardContent>
         {expenseBreakdown === undefined ? (
           <p className="text-sm text-slate-600">Loading expense breakdown...</p>
         ) : chartData.length === 0 ? (
           <p className="text-sm text-slate-600">
-            No expense transactions found yet.
+            No expense transactions found for the selected month.
           </p>
         ) : (
           <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(220px,280px)]">

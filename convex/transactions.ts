@@ -30,6 +30,33 @@ function getMonthStarts(monthCount: number) {
   return monthStarts;
 }
 
+function parseIsoDateToUtcTimestamp(dateString: string, fieldName: string) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateString);
+
+  if (!match) {
+    throw new Error(`${fieldName} must use YYYY-MM-DD format`);
+  }
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const timestamp = Date.UTC(year, month - 1, day);
+  const parsedDate = new Date(timestamp);
+
+  if (
+    !Number.isInteger(year) ||
+    !Number.isInteger(month) ||
+    !Number.isInteger(day) ||
+    parsedDate.getUTCFullYear() !== year ||
+    parsedDate.getUTCMonth() !== month - 1 ||
+    parsedDate.getUTCDate() !== day
+  ) {
+    throw new Error(`${fieldName} must be a valid calendar date`);
+  }
+
+  return timestamp;
+}
+
 export const listForCurrentUser = query({
   args: {},
   handler: async (ctx) => {
@@ -71,17 +98,35 @@ export const listForCurrentUser = query({
 export const expenseBreakdownByCategory = query({
   args: {
     accountIds: v.optional(v.array(v.id("bankAccounts"))),
-    monthCount: v.optional(v.number()),
+    monthRange: v.optional(
+      v.object({
+        end: v.string(),
+        start: v.string(),
+      }),
+    ),
   },
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
     const accountIdFilter = args.accountIds
       ? new Set<Id<"bankAccounts">>(args.accountIds)
       : null;
-    const monthStartFilter =
-      args.monthCount === undefined
+    const selectedMonthRange =
+      args.monthRange === undefined
         ? null
-        : new Set<number>(getMonthStarts(args.monthCount));
+        : {
+            end: parseIsoDateToUtcTimestamp(args.monthRange.end, "monthRange.end"),
+            start: parseIsoDateToUtcTimestamp(
+              args.monthRange.start,
+              "monthRange.start",
+            ),
+          };
+
+    if (
+      selectedMonthRange !== null &&
+      selectedMonthRange.end <= selectedMonthRange.start
+    ) {
+      throw new Error("monthRange.end must be after monthRange.start");
+    }
     const transactions = await ctx.db
       .query("transactions")
       .withIndex("by_userId_and_purchaseDate_createdAt", (q) =>
@@ -103,17 +148,12 @@ export const expenseBreakdownByCategory = query({
         continue;
       }
 
-      if (monthStartFilter) {
-        const purchaseDate = new Date(transaction.purchaseDate);
-        const monthStart = Date.UTC(
-          purchaseDate.getUTCFullYear(),
-          purchaseDate.getUTCMonth(),
-          1,
-        );
-
-        if (!monthStartFilter.has(monthStart)) {
-          continue;
-        }
+      if (
+        selectedMonthRange !== null &&
+        (transaction.purchaseDate < selectedMonthRange.start ||
+          transaction.purchaseDate >= selectedMonthRange.end)
+      ) {
+        continue;
       }
 
       const current = totalsByCategory.get(transaction.categoryId) ?? {
