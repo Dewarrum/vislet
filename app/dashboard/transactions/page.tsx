@@ -311,7 +311,7 @@ export default function TransactionsPage() {
   };
 
   return (
-    <div className="mx-auto flex w-full max-w-7xl flex-col gap-4">
+    <div className="mx-auto flex w-full flex-col gap-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight text-slate-900">
@@ -392,6 +392,10 @@ export default function TransactionsPage() {
                     !isSavingAmount &&
                     isDraftAmountValid &&
                     nextSignedAmount !== transaction.amount;
+                  const formattedAmount = formatAmount(
+                    Math.abs(transaction.amount),
+                    transaction.accountCurrency,
+                  );
                   const canSaveName =
                     !isSavingName &&
                     trimmedDraftName.length > 0 &&
@@ -432,12 +436,12 @@ export default function TransactionsPage() {
                           </MenuPopup>
                         </Menu>
                       </TableCell>
-                      <TableCell>
-                        {isEditingAmount ? (
-                          <div className="flex items-center gap-2">
+                      <TableCell className="w-[260px] min-w-[260px]">
+                        <div className="grid grid-cols-[minmax(0,1fr)_auto_auto_auto] items-center gap-2">
+                          {isEditingAmount ? (
                             <Input
                               aria-label={`Amount for ${transaction._id}`}
-                              className="w-28"
+                              className="w-full min-w-0"
                               disabled={isSavingAmount}
                               onChange={(event) =>
                                 setDraftAmounts((previous) => ({
@@ -447,54 +451,51 @@ export default function TransactionsPage() {
                               }
                               value={draftAmountValue}
                             />
-                            <Button
-                              disabled={!canSaveAmount}
-                              onClick={() =>
-                                onSaveAmount(transaction._id, transaction.amount)
-                              }
-                              size="xs"
-                              variant="outline"
-                            >
-                              {isSavingAmount ? "Saving..." : "Save"}
-                            </Button>
-                            <Button
-                              disabled={isSavingAmount}
-                              onClick={() => onCancelAmountEdit(transaction._id)}
-                              size="xs"
-                              variant="outline"
-                            >
-                              Cancel
-                            </Button>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-2">
-                            <span>
-                              {formatAmount(
-                                Math.abs(transaction.amount),
-                                transaction.accountCurrency,
-                              )}
-                            </span>
-                            <Button
-                              aria-label={`Edit amount for ${transaction._id}`}
-                              disabled={
-                                isEditingName ||
-                                isSavingName ||
-                                isSavingAmount ||
-                                isSwitchingType ||
-                                isSwitchingAccount ||
-                                isSwitchingCategory ||
-                                isDeleting
-                              }
-                              onClick={() =>
-                                onStartAmountEdit(transaction._id, transaction.amount)
-                              }
-                              size="icon-xs"
-                              variant="ghost"
-                            >
-                              <PencilIcon />
-                            </Button>
-                          </div>
-                        )}
+                          ) : (
+                            <span className="truncate">{formattedAmount}</span>
+                          )}
+                          <Button
+                            aria-label={`Edit amount for ${transaction._id}`}
+                            className={isEditingAmount ? "invisible" : "justify-self-end"}
+                            disabled={
+                              isEditingAmount ||
+                              isEditingName ||
+                              isSavingName ||
+                              isSavingAmount ||
+                              isSwitchingType ||
+                              isSwitchingAccount ||
+                              isSwitchingCategory ||
+                              isDeleting
+                            }
+                            onClick={() =>
+                              onStartAmountEdit(transaction._id, transaction.amount)
+                            }
+                            size="icon-xs"
+                            variant="ghost"
+                          >
+                            <PencilIcon />
+                          </Button>
+                          <Button
+                            className={isEditingAmount ? "justify-self-end" : "invisible justify-self-end"}
+                            disabled={!isEditingAmount || !canSaveAmount}
+                            onClick={() =>
+                              onSaveAmount(transaction._id, transaction.amount)
+                            }
+                            size="xs"
+                            variant="outline"
+                          >
+                            {isSavingAmount ? "Saving..." : "Save"}
+                          </Button>
+                          <Button
+                            className={isEditingAmount ? "justify-self-end" : "invisible justify-self-end"}
+                            disabled={!isEditingAmount || isSavingAmount}
+                            onClick={() => onCancelAmountEdit(transaction._id)}
+                            size="xs"
+                            variant="outline"
+                          >
+                            Cancel
+                          </Button>
+                        </div>
                       </TableCell>
                       <TableCell>{transaction.accountCurrency}</TableCell>
                       <TableCell>
@@ -587,11 +588,12 @@ export default function TransactionsPage() {
                           </MenuPopup>
                         </Menu>
                       </TableCell>
-                      <TableCell className="w-[22%] min-w-[220px]">
-                        {isEditingName ? (
-                          <div className="flex items-center gap-2">
+                      <TableCell className="w-[320px] min-w-[320px]">
+                        <div className="grid grid-cols-[minmax(0,1fr)_auto_auto_auto] items-center gap-2">
+                          {isEditingName ? (
                             <Input
                               aria-label={`Name for ${transaction._id}`}
+                              className="w-full min-w-0"
                               disabled={isSavingName}
                               onChange={(event) =>
                                 setDraftNames((previous) => ({
@@ -601,49 +603,51 @@ export default function TransactionsPage() {
                               }
                               value={draftNameValue}
                             />
-                            <Button
-                              disabled={!canSaveName}
-                              onClick={() =>
-                                onSaveName(transaction._id, transaction.name)
-                              }
-                              size="xs"
-                              variant="outline"
-                            >
-                              {isSavingName ? "Saving..." : "Save"}
-                            </Button>
-                            <Button
-                              disabled={isSavingName}
-                              onClick={() => onCancelNameEdit(transaction._id)}
-                              size="xs"
-                              variant="outline"
-                            >
-                              Cancel
-                            </Button>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-2">
-                            <span>{transaction.name}</span>
-                            <Button
-                              aria-label={`Edit name for ${transaction._id}`}
-                              disabled={
-                                isSavingName ||
-                                isEditingAmount ||
-                                isSavingAmount ||
-                                isSwitchingType ||
-                                isSwitchingAccount ||
-                                isSwitchingCategory ||
-                                isDeleting
-                              }
-                              onClick={() =>
-                                onStartNameEdit(transaction._id, transaction.name)
-                              }
-                              size="icon-xs"
-                              variant="ghost"
-                            >
-                              <PencilIcon />
-                            </Button>
-                          </div>
-                        )}
+                          ) : (
+                            <span className="truncate">{transaction.name}</span>
+                          )}
+                          <Button
+                            aria-label={`Edit name for ${transaction._id}`}
+                            className={isEditingName ? "invisible" : "justify-self-end"}
+                            disabled={
+                              isEditingName ||
+                              isSavingName ||
+                              isEditingAmount ||
+                              isSavingAmount ||
+                              isSwitchingType ||
+                              isSwitchingAccount ||
+                              isSwitchingCategory ||
+                              isDeleting
+                            }
+                            onClick={() =>
+                              onStartNameEdit(transaction._id, transaction.name)
+                            }
+                            size="icon-xs"
+                            variant="ghost"
+                          >
+                            <PencilIcon />
+                          </Button>
+                          <Button
+                            className={isEditingName ? "justify-self-end" : "invisible justify-self-end"}
+                            disabled={!isEditingName || !canSaveName}
+                            onClick={() =>
+                              onSaveName(transaction._id, transaction.name)
+                            }
+                            size="xs"
+                            variant="outline"
+                          >
+                            {isSavingName ? "Saving..." : "Save"}
+                          </Button>
+                          <Button
+                            className={isEditingName ? "justify-self-end" : "invisible justify-self-end"}
+                            disabled={!isEditingName || isSavingName}
+                            onClick={() => onCancelNameEdit(transaction._id)}
+                            size="xs"
+                            variant="outline"
+                          >
+                            Cancel
+                          </Button>
+                        </div>
                       </TableCell>
                       <TableCell>
                         {formatPurchaseDate(transaction.purchaseDate)}
