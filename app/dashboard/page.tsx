@@ -21,6 +21,19 @@ export default function DashboardPage() {
           </div>
         </CardHeader>
       </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>Categories</CardTitle>
+          <CardDescription>
+            Create and maintain your expense categories.
+          </CardDescription>
+          <div className="pt-2">
+            <Button render={<Link href="/dashboard/categories" />} variant="outline">
+              Open categories
+            </Button>
+          </div>
+        </CardHeader>
+      </Card>
     </div>
   );
 }

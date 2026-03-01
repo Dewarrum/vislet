@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { UserButton } from "@clerk/nextjs";
-import { Building2Icon, LayoutDashboardIcon } from "lucide-react";
+import { Building2Icon, LayoutDashboardIcon, TagsIcon } from "lucide-react";
 import { usePathname } from "next/navigation";
 import {
   Sidebar,
@@ -30,6 +30,11 @@ const navItems = [
     href: "/dashboard/bank-accounts",
     icon: Building2Icon,
     label: "Bank accounts",
+  },
+  {
+    href: "/dashboard/categories",
+    icon: TagsIcon,
+    label: "Categories",
   },
 ];
 

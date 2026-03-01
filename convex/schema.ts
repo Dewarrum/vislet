@@ -12,6 +12,11 @@ export default defineSchema({
     name: v.string(),
     userId: v.string(),
   }).index("by_userId_and_createdAt", ["userId", "createdAt"]),
+  categories: defineTable({
+    createdAt: v.number(),
+    name: v.string(),
+    userId: v.string(),
+  }).index("by_userId_and_createdAt", ["userId", "createdAt"]),
   numbers: defineTable({
     value: v.number(),
   }),
