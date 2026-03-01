@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -61,6 +62,8 @@ function parseDateInput(dateInput: string) {
   return Date.UTC(year, month - 1, day);
 }
 
+type TransactionType = "expense" | "income";
+
 export default function TransactionsPage() {
   const transactions = useQuery(api.transactions.listForCurrentUser);
   const accounts = useQuery(api.bankAccounts.listForCurrentUser);
@@ -71,6 +74,7 @@ export default function TransactionsPage() {
 
   const [newAccountId, setNewAccountId] = useState<Id<"bankAccounts"> | "">("");
   const [newAmount, setNewAmount] = useState("");
+  const [newType, setNewType] = useState<TransactionType>("expense");
   const [newCategoryId, setNewCategoryId] = useState<Id<"categories"> | "">("");
   const [newName, setNewName] = useState("");
   const [newPurchaseDate, setNewPurchaseDate] = useState(() =>
@@ -101,6 +105,8 @@ export default function TransactionsPage() {
   const onCreate = async () => {
     const trimmedName = newName.trim();
     const parsedAmount = Number(newAmount);
+    const amountToSave =
+      newType === "income" ? parsedAmount : -Math.abs(parsedAmount);
     const parsedPurchaseDate = parseDateInput(newPurchaseDate);
 
     if (!newAccountId) {
@@ -134,7 +140,7 @@ export default function TransactionsPage() {
     try {
       await createTransaction({
         accountId: newAccountId,
-        amount: parsedAmount,
+        amount: amountToSave,
         categoryId: newCategoryId,
         name: trimmedName,
         purchaseDate: parsedPurchaseDate,
@@ -223,7 +229,7 @@ export default function TransactionsPage() {
             purchase date.
           </CardDescription>
         </CardHeader>
-        <div className="grid gap-3 px-6 pb-6 md:grid-cols-6 md:items-end">
+        <div className="grid gap-3 px-6 pb-6 md:grid-cols-7 md:items-end">
           <div className="space-y-2 md:col-span-1">
             <Label htmlFor="new-transaction-account">Account</Label>
             <select
@@ -254,6 +260,21 @@ export default function TransactionsPage() {
               type="number"
               value={newAmount}
             />
+          </div>
+
+          <div className="space-y-2 md:col-span-1">
+            <Label htmlFor="new-transaction-type">Type</Label>
+            <select
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              id="new-transaction-type"
+              onChange={(event) =>
+                setNewType(event.target.value as TransactionType)
+              }
+              value={newType}
+            >
+              <option value="expense">Expense</option>
+              <option value="income">Income</option>
+            </select>
           </div>
 
           <div className="space-y-2 md:col-span-1">
@@ -320,6 +341,7 @@ export default function TransactionsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>Type</TableHead>
                   <TableHead>Amount</TableHead>
                   <TableHead>Account currency</TableHead>
                   <TableHead>Account name</TableHead>
@@ -335,6 +357,7 @@ export default function TransactionsPage() {
                     draftNames[transaction._id] ?? transaction.name;
                   const isSaving = savingId === transaction._id;
                   const isDeleting = deletingId === transaction._id;
+                  const isExpense = transaction.amount < 0;
                   const canSave =
                     draftName.trim().length > 0 &&
                     draftName.trim() !== transaction.name &&
@@ -344,8 +367,13 @@ export default function TransactionsPage() {
                   return (
                     <TableRow key={transaction._id}>
                       <TableCell>
+                        <Badge size="sm" variant={isExpense ? "error" : "success"}>
+                          {isExpense ? "Expense" : "Income"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
                         {formatAmount(
-                          transaction.amount,
+                          Math.abs(transaction.amount),
                           transaction.accountCurrency,
                         )}
                       </TableCell>
