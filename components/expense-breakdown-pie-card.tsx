@@ -60,10 +60,15 @@ export default function ExpenseBreakdownPieCard() {
       return [];
     }
 
-    const defaultCurrency = accountOptions[0].currency;
-    return accountOptions
-      .filter((account) => account.currency === defaultCurrency)
-      .map((account) => account._id);
+    const explicitDefaultId = accountOptions.find(
+      (account) => account.isDefault === true,
+    )?._id;
+
+    if (explicitDefaultId) {
+      return [explicitDefaultId];
+    }
+
+    return [accountOptions[0]._id];
   }, [accountOptions]);
   const effectiveSelectedAccountIds = useMemo(() => {
     if (selectedAccountIds.length === 0) {

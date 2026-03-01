@@ -9,6 +9,7 @@ export default defineSchema({
   bankAccounts: defineTable({
     createdAt: v.number(),
     currency: v.string(),
+    isDefault: v.optional(v.boolean()),
     name: v.string(),
     userId: v.string(),
   }).index("by_userId_and_createdAt", ["userId", "createdAt"]),

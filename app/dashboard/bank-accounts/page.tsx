@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -28,6 +29,7 @@ export default function BankAccountsPage() {
   const accounts = useQuery(api.bankAccounts.listForCurrentUser);
   const createBankAccount = useMutation(api.bankAccounts.create);
   const renameBankAccount = useMutation(api.bankAccounts.rename);
+  const setDefaultBankAccount = useMutation(api.bankAccounts.setDefault);
   const removeBankAccount = useMutation(api.bankAccounts.remove);
 
   const [draftNames, setDraftNames] = useState<Record<string, string>>({});
@@ -35,6 +37,7 @@ export default function BankAccountsPage() {
   const [newCurrency, setNewCurrency] = useState("USD");
   const [isCreating, setIsCreating] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [settingDefaultId, setSettingDefaultId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -119,6 +122,19 @@ export default function BankAccountsPage() {
     }
   };
 
+  const onSetDefault = async (accountId: Id<"bankAccounts">) => {
+    setSettingDefaultId(accountId);
+    setErrorMessage(null);
+
+    try {
+      await setDefaultBankAccount({ accountId });
+    } catch {
+      setErrorMessage("Could not set the default bank account. Please try again.");
+    } finally {
+      setSettingDefaultId(null);
+    }
+  };
+
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-4">
       <div>
@@ -169,8 +185,8 @@ export default function BankAccountsPage() {
         <CardHeader>
           <CardTitle>Your accounts</CardTitle>
           <CardDescription>
-            Each account stores an id, editable name, created timestamp, and
-            currency.
+            Each account stores an id, editable name, created timestamp,
+            currency, and optional default status.
           </CardDescription>
         </CardHeader>
 
@@ -186,6 +202,7 @@ export default function BankAccountsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
+                  <TableHead>Default</TableHead>
                   <TableHead>Currency</TableHead>
                   <TableHead>Created at</TableHead>
                   <TableHead>ID</TableHead>
@@ -196,12 +213,15 @@ export default function BankAccountsPage() {
                 {accountRows.map((account) => {
                   const draftName = draftNames[account._id] ?? account.name;
                   const isSaving = savingId === account._id;
+                  const isSettingDefault = settingDefaultId === account._id;
                   const isDeleting = deletingId === account._id;
+                  const isDefault = account.isDefault === true;
                   const canSave =
                     draftName.trim().length > 0 &&
                     draftName.trim() !== account.name &&
                     !isSaving &&
-                    !isDeleting;
+                    !isDeleting &&
+                    !isSettingDefault;
 
                   return (
                     <TableRow key={account._id}>
@@ -216,6 +236,15 @@ export default function BankAccountsPage() {
                           }
                           value={draftName}
                         />
+                      </TableCell>
+                      <TableCell>
+                        {isDefault ? (
+                          <Badge size="sm" variant="success">
+                            Default
+                          </Badge>
+                        ) : (
+                          <span className="text-xs text-slate-500">No</span>
+                        )}
                       </TableCell>
                       <TableCell>{account.currency}</TableCell>
                       <TableCell>{formatCreatedAt(account.createdAt)}</TableCell>
@@ -233,7 +262,15 @@ export default function BankAccountsPage() {
                             {isSaving ? "Saving..." : "Save name"}
                           </Button>
                           <Button
-                            disabled={isDeleting || isSaving}
+                            disabled={isDefault || isDeleting || isSaving || isSettingDefault}
+                            onClick={() => onSetDefault(account._id)}
+                            size="sm"
+                            variant="outline"
+                          >
+                            {isSettingDefault ? "Setting..." : "Set default"}
+                          </Button>
+                          <Button
+                            disabled={isDeleting || isSaving || isSettingDefault}
                             onClick={() => onDelete(account._id, account.name)}
                             size="sm"
                             variant="destructive-outline"

@@ -92,12 +92,30 @@ export default function TransactionsPage() {
   const transactionRows = useMemo(() => transactions ?? [], [transactions]);
   const accountOptions = useMemo(() => accounts ?? [], [accounts]);
   const categoryOptions = useMemo(() => categories ?? [], [categories]);
+  const defaultAccountId = useMemo(
+    () =>
+      accountOptions.find((account) => account.isDefault === true)?._id ??
+      accountOptions[0]?._id ??
+      "",
+    [accountOptions],
+  );
 
   useEffect(() => {
-    if (!newAccountId && accountOptions.length > 0) {
-      setNewAccountId(accountOptions[0]._id);
+    if (accountOptions.length === 0) {
+      if (newAccountId !== "") {
+        setNewAccountId("");
+      }
+      return;
     }
-  }, [newAccountId, accountOptions]);
+
+    const isCurrentAccountValid = accountOptions.some(
+      (account) => account._id === newAccountId,
+    );
+
+    if (!isCurrentAccountValid && defaultAccountId) {
+      setNewAccountId(defaultAccountId);
+    }
+  }, [accountOptions, defaultAccountId, newAccountId]);
 
   useEffect(() => {
     if (!newCategoryId && categoryOptions.length > 0) {
