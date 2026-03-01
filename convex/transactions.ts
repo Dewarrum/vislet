@@ -241,6 +241,119 @@ export const changeType = mutation({
   },
 });
 
+export const changeAmount = mutation({
+  args: {
+    amount: v.number(),
+    transactionId: v.id("transactions"),
+  },
+  handler: async (ctx, args) => {
+    const userId = await requireUserId(ctx);
+    const transaction = await ctx.db.get(args.transactionId);
+
+    if (!transaction) {
+      throw new Error("Transaction not found");
+    }
+
+    if (transaction.userId !== userId) {
+      throw new Error("Unauthorized");
+    }
+
+    if (!Number.isFinite(args.amount)) {
+      throw new Error("Amount must be a valid number");
+    }
+
+    if (transaction.amount === args.amount) {
+      return null;
+    }
+
+    await ctx.db.patch(args.transactionId, {
+      amount: args.amount,
+    });
+
+    return null;
+  },
+});
+
+export const changeCategory = mutation({
+  args: {
+    categoryId: v.id("categories"),
+    transactionId: v.id("transactions"),
+  },
+  handler: async (ctx, args) => {
+    const userId = await requireUserId(ctx);
+    const [transaction, category] = await Promise.all([
+      ctx.db.get(args.transactionId),
+      ctx.db.get(args.categoryId),
+    ]);
+
+    if (!transaction) {
+      throw new Error("Transaction not found");
+    }
+
+    if (transaction.userId !== userId) {
+      throw new Error("Unauthorized");
+    }
+
+    if (!category) {
+      throw new Error("Category not found");
+    }
+
+    if (category.userId !== userId) {
+      throw new Error("Unauthorized");
+    }
+
+    if (transaction.categoryId === args.categoryId) {
+      return null;
+    }
+
+    await ctx.db.patch(args.transactionId, {
+      categoryId: args.categoryId,
+    });
+
+    return null;
+  },
+});
+
+export const changeAccount = mutation({
+  args: {
+    accountId: v.id("bankAccounts"),
+    transactionId: v.id("transactions"),
+  },
+  handler: async (ctx, args) => {
+    const userId = await requireUserId(ctx);
+    const [transaction, account] = await Promise.all([
+      ctx.db.get(args.transactionId),
+      ctx.db.get(args.accountId),
+    ]);
+
+    if (!transaction) {
+      throw new Error("Transaction not found");
+    }
+
+    if (transaction.userId !== userId) {
+      throw new Error("Unauthorized");
+    }
+
+    if (!account) {
+      throw new Error("Bank account not found");
+    }
+
+    if (account.userId !== userId) {
+      throw new Error("Unauthorized");
+    }
+
+    if (transaction.accountId === args.accountId) {
+      return null;
+    }
+
+    await ctx.db.patch(args.transactionId, {
+      accountId: args.accountId,
+    });
+
+    return null;
+  },
+});
+
 export const remove = mutation({
   args: {
     transactionId: v.id("transactions"),

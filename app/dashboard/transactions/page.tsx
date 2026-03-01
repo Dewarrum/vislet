@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
+import { PencilIcon } from "lucide-react";
 import { CreateTransactionDialog } from "@/components/create-transaction-dialog";
 import type { CreateTransactionInput } from "@/components/create-transaction-dialog";
 import { Badge } from "@/components/ui/badge";
@@ -51,11 +52,23 @@ export default function TransactionsPage() {
   const createTransaction = useMutation(api.transactions.create);
   const renameTransaction = useMutation(api.transactions.rename);
   const changeTransactionType = useMutation(api.transactions.changeType);
+  const changeTransactionAmount = useMutation(api.transactions.changeAmount);
+  const changeTransactionCategory = useMutation(api.transactions.changeCategory);
+  const changeTransactionAccount = useMutation(api.transactions.changeAccount);
   const removeTransaction = useMutation(api.transactions.remove);
 
   const [draftNames, setDraftNames] = useState<Record<string, string>>({});
+  const [draftAmounts, setDraftAmounts] = useState<Record<string, string>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [editingAmountId, setEditingAmountId] = useState<string | null>(null);
+  const [savingAmountId, setSavingAmountId] = useState<string | null>(null);
   const [switchingTypeId, setSwitchingTypeId] = useState<string | null>(null);
+  const [switchingAccountId, setSwitchingAccountId] = useState<string | null>(
+    null,
+  );
+  const [switchingCategoryId, setSwitchingCategoryId] = useState<string | null>(
+    null,
+  );
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -114,10 +127,74 @@ export default function TransactionsPage() {
         delete next[transactionId];
         return next;
       });
+      setDraftAmounts((previous) => {
+        const next = { ...previous };
+        delete next[transactionId];
+        return next;
+      });
     } catch {
       setErrorMessage("Could not delete the transaction. Please try again.");
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const onStartAmountEdit = (
+    transactionId: Id<"transactions">,
+    currentAmount: number,
+  ) => {
+    setEditingAmountId(transactionId);
+    setErrorMessage(null);
+    setDraftAmounts((previous) => ({
+      ...previous,
+      [transactionId]: Math.abs(currentAmount).toString(),
+    }));
+  };
+
+  const onCancelAmountEdit = (transactionId: Id<"transactions">) => {
+    setEditingAmountId((previous) =>
+      previous === transactionId ? null : previous,
+    );
+    setDraftAmounts((previous) => {
+      const next = { ...previous };
+      delete next[transactionId];
+      return next;
+    });
+  };
+
+  const onSaveAmount = async (
+    transactionId: Id<"transactions">,
+    currentAmount: number,
+  ) => {
+    const draftAmount = draftAmounts[transactionId]?.trim() ?? "";
+    const parsedAmount = Number(draftAmount);
+
+    if (!draftAmount || !Number.isFinite(parsedAmount)) {
+      setErrorMessage("Amount must be a valid number.");
+      return;
+    }
+
+    const nextAmount =
+      currentAmount < 0 ? -Math.abs(parsedAmount) : Math.abs(parsedAmount);
+
+    if (nextAmount === currentAmount) {
+      onCancelAmountEdit(transactionId);
+      return;
+    }
+
+    setSavingAmountId(transactionId);
+    setErrorMessage(null);
+
+    try {
+      await changeTransactionAmount({
+        amount: nextAmount,
+        transactionId,
+      });
+      onCancelAmountEdit(transactionId);
+    } catch {
+      setErrorMessage("Could not change the transaction amount. Please try again.");
+    } finally {
+      setSavingAmountId(null);
     }
   };
 
@@ -143,6 +220,54 @@ export default function TransactionsPage() {
     }
   };
 
+  const onChangeCategory = async (
+    transactionId: Id<"transactions">,
+    currentCategoryId: Id<"categories">,
+    nextCategoryId: Id<"categories">,
+  ) => {
+    if (currentCategoryId === nextCategoryId) {
+      return;
+    }
+
+    setSwitchingCategoryId(transactionId);
+    setErrorMessage(null);
+
+    try {
+      await changeTransactionCategory({
+        categoryId: nextCategoryId,
+        transactionId,
+      });
+    } catch {
+      setErrorMessage("Could not change the transaction category. Please try again.");
+    } finally {
+      setSwitchingCategoryId(null);
+    }
+  };
+
+  const onChangeAccount = async (
+    transactionId: Id<"transactions">,
+    currentAccountId: Id<"bankAccounts">,
+    nextAccountId: Id<"bankAccounts">,
+  ) => {
+    if (currentAccountId === nextAccountId) {
+      return;
+    }
+
+    setSwitchingAccountId(transactionId);
+    setErrorMessage(null);
+
+    try {
+      await changeTransactionAccount({
+        accountId: nextAccountId,
+        transactionId,
+      });
+    } catch {
+      setErrorMessage("Could not change the transaction account. Please try again.");
+    } finally {
+      setSwitchingAccountId(null);
+    }
+  };
+
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -165,8 +290,9 @@ export default function TransactionsPage() {
         <CardHeader>
           <CardTitle>Your transactions</CardTitle>
           <CardDescription>
-            You can edit names, click a type badge to switch between expense and
-            income, and delete transactions.
+            You can edit names and amounts, click a type badge to switch between
+            expense and income, click account/category badges to reassign them,
+            and delete transactions.
           </CardDescription>
         </CardHeader>
 
@@ -194,19 +320,44 @@ export default function TransactionsPage() {
                   const draftName =
                     draftNames[transaction._id] ?? transaction.name;
                   const isSaving = savingId === transaction._id;
+                  const isEditingAmount = editingAmountId === transaction._id;
+                  const isSavingAmount = savingAmountId === transaction._id;
                   const isSwitchingType = switchingTypeId === transaction._id;
+                  const isSwitchingAccount =
+                    switchingAccountId === transaction._id;
+                  const isSwitchingCategory =
+                    switchingCategoryId === transaction._id;
                   const isDeleting = deletingId === transaction._id;
                   const isExpense = transaction.amount < 0;
                   const currentType: TransactionType = isExpense
                     ? "expense"
                     : "income";
                   const nextTypeLabel = isExpense ? "Income" : "Expense";
+                  const draftAmountValue =
+                    draftAmounts[transaction._id] ??
+                    Math.abs(transaction.amount).toString();
+                  const trimmedDraftAmount = draftAmountValue.trim();
+                  const parsedDraftAmount = Number(trimmedDraftAmount);
+                  const isDraftAmountValid =
+                    trimmedDraftAmount.length > 0 &&
+                    Number.isFinite(parsedDraftAmount);
+                  const nextSignedAmount = isExpense
+                    ? -Math.abs(parsedDraftAmount)
+                    : Math.abs(parsedDraftAmount);
+                  const canSaveAmount =
+                    !isSavingAmount &&
+                    isDraftAmountValid &&
+                    nextSignedAmount !== transaction.amount;
                   const canSave =
                     draftName.trim().length > 0 &&
                     draftName.trim() !== transaction.name &&
                     !isSaving &&
                     !isDeleting &&
-                    !isSwitchingType;
+                    !isEditingAmount &&
+                    !isSavingAmount &&
+                    !isSwitchingType &&
+                    !isSwitchingAccount &&
+                    !isSwitchingCategory;
 
                   return (
                     <TableRow key={transaction._id}>
@@ -222,7 +373,15 @@ export default function TransactionsPage() {
                           </MenuTrigger>
                           <MenuPopup align="start">
                             <MenuItem
-                              disabled={isSwitchingType || isSaving || isDeleting}
+                              disabled={
+                                isEditingAmount ||
+                                isSavingAmount ||
+                                isSwitchingType ||
+                                isSwitchingAccount ||
+                                isSwitchingCategory ||
+                                isSaving ||
+                                isDeleting
+                              }
                               onClick={() =>
                                 onChangeType(transaction._id, currentType)
                               }
@@ -235,14 +394,157 @@ export default function TransactionsPage() {
                         </Menu>
                       </TableCell>
                       <TableCell>
-                        {formatAmount(
-                          Math.abs(transaction.amount),
-                          transaction.accountCurrency,
+                        {isEditingAmount ? (
+                          <div className="flex items-center gap-2">
+                            <Input
+                              aria-label={`Amount for ${transaction._id}`}
+                              className="w-28"
+                              disabled={isSavingAmount}
+                              onChange={(event) =>
+                                setDraftAmounts((previous) => ({
+                                  ...previous,
+                                  [transaction._id]: event.target.value,
+                                }))
+                              }
+                              value={draftAmountValue}
+                            />
+                            <Button
+                              disabled={!canSaveAmount}
+                              onClick={() =>
+                                onSaveAmount(transaction._id, transaction.amount)
+                              }
+                              size="xs"
+                              variant="outline"
+                            >
+                              {isSavingAmount ? "Saving..." : "Save"}
+                            </Button>
+                            <Button
+                              disabled={isSavingAmount}
+                              onClick={() => onCancelAmountEdit(transaction._id)}
+                              size="xs"
+                              variant="outline"
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <span>
+                              {formatAmount(
+                                Math.abs(transaction.amount),
+                                transaction.accountCurrency,
+                              )}
+                            </span>
+                            <Button
+                              aria-label={`Edit amount for ${transaction._id}`}
+                              disabled={
+                                isSaving ||
+                                isSavingAmount ||
+                                isSwitchingType ||
+                                isSwitchingAccount ||
+                                isSwitchingCategory ||
+                                isDeleting
+                              }
+                              onClick={() =>
+                                onStartAmountEdit(transaction._id, transaction.amount)
+                              }
+                              size="icon-xs"
+                              variant="ghost"
+                            >
+                              <PencilIcon />
+                            </Button>
+                          </div>
                         )}
                       </TableCell>
                       <TableCell>{transaction.accountCurrency}</TableCell>
-                      <TableCell>{transaction.accountName}</TableCell>
-                      <TableCell>{transaction.categoryName}</TableCell>
+                      <TableCell>
+                        <Menu>
+                          <MenuTrigger className="inline-flex cursor-pointer appearance-none rounded-sm border-0 bg-transparent p-0 text-inherit outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background">
+                            <Badge size="lg" variant="outline">
+                              {transaction.accountName}
+                            </Badge>
+                          </MenuTrigger>
+                          <MenuPopup align="start">
+                            {accountOptions.length === 0 ? (
+                              <MenuItem disabled>No accounts available</MenuItem>
+                            ) : (
+                              accountOptions.map((account) => {
+                                const isCurrentAccount =
+                                  account._id === transaction.accountId;
+
+                                return (
+                                  <MenuItem
+                                    disabled={
+                                      isEditingAmount ||
+                                      isSavingAmount ||
+                                      isSwitchingAccount ||
+                                      isSwitchingCategory ||
+                                      isSwitchingType ||
+                                      isSaving ||
+                                      isDeleting ||
+                                      isCurrentAccount
+                                    }
+                                    key={account._id}
+                                    onClick={() =>
+                                      onChangeAccount(
+                                        transaction._id,
+                                        transaction.accountId,
+                                        account._id,
+                                      )
+                                    }
+                                  >
+                                    {isCurrentAccount ? `${account.name} (Current)` : account.name}
+                                  </MenuItem>
+                                );
+                              })
+                            )}
+                          </MenuPopup>
+                        </Menu>
+                      </TableCell>
+                      <TableCell>
+                        <Menu>
+                          <MenuTrigger className="inline-flex cursor-pointer appearance-none rounded-sm border-0 bg-transparent p-0 text-inherit outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background">
+                            <Badge size="lg" variant="outline">
+                              {transaction.categoryName}
+                            </Badge>
+                          </MenuTrigger>
+                          <MenuPopup align="start">
+                            {categoryOptions.length === 0 ? (
+                              <MenuItem disabled>No categories available</MenuItem>
+                            ) : (
+                              categoryOptions.map((category) => {
+                                const isCurrentCategory =
+                                  category._id === transaction.categoryId;
+
+                                return (
+                                  <MenuItem
+                                    disabled={
+                                      isEditingAmount ||
+                                      isSavingAmount ||
+                                      isSwitchingAccount ||
+                                      isSwitchingCategory ||
+                                      isSwitchingType ||
+                                      isSaving ||
+                                      isDeleting ||
+                                      isCurrentCategory
+                                    }
+                                    key={category._id}
+                                    onClick={() =>
+                                      onChangeCategory(
+                                        transaction._id,
+                                        transaction.categoryId,
+                                        category._id,
+                                      )
+                                    }
+                                  >
+                                    {isCurrentCategory ? `${category.name} (Current)` : category.name}
+                                  </MenuItem>
+                                );
+                              })
+                            )}
+                          </MenuPopup>
+                        </Menu>
+                      </TableCell>
                       <TableCell className="w-[22%] min-w-[220px]">
                         <Input
                           aria-label={`Name for ${transaction._id}`}
@@ -271,7 +573,15 @@ export default function TransactionsPage() {
                             {isSaving ? "Saving..." : "Save name"}
                           </Button>
                           <Button
-                            disabled={isDeleting || isSaving || isSwitchingType}
+                            disabled={
+                              isDeleting ||
+                              isSaving ||
+                              isEditingAmount ||
+                              isSavingAmount ||
+                              isSwitchingType ||
+                              isSwitchingAccount ||
+                              isSwitchingCategory
+                            }
                             onClick={() =>
                               onDelete(transaction._id, transaction.name)
                             }
