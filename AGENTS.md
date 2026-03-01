@@ -40,6 +40,6 @@ This repository is a full-stack TypeScript app built with Next.js (App Router), 
 
 ## Common Commands
 
-- `npm run dev`: run frontend and Convex backend in parallel.
-- `npm run build`: production build.
-- `npm run lint`: run ESLint.
+- `pnpm dev`: run frontend and Convex backend in parallel.
+- `pnpm build`: production build.
+- `pnpm lint`: run ESLint.
