@@ -1,27 +1,17 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useQuery } from "convex/react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
-import { Button } from "@/components/ui/button";
 import {
   Card,
-  CardAction,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Menu,
-  MenuCheckboxItem,
-  MenuItem,
-  MenuPopup,
-  MenuSeparator,
-  MenuTrigger,
-} from "@/components/ui/menu";
 
 const CHART_COLORS = [
   "#0ea5e9",
@@ -41,163 +31,26 @@ function formatAmount(amount: number) {
   }).format(amount);
 }
 
-export default function ExpenseBreakdownPieCard() {
-  const accounts = useQuery(api.bankAccounts.listForCurrentUser);
-  const accountOptions = useMemo(() => accounts ?? [], [accounts]);
-  const [selectedAccountIds, setSelectedAccountIds] = useState<
-    Array<Id<"bankAccounts">>
-  >([]);
-  const accountIds = useMemo(
-    () => accountOptions.map((account) => account._id),
-    [accountOptions],
+type ExpenseBreakdownPieCardProps = {
+  monthRange: number;
+  selectedAccountIds: Array<Id<"bankAccounts">>;
+};
+
+export default function ExpenseBreakdownPieCard({
+  monthRange,
+  selectedAccountIds,
+}: ExpenseBreakdownPieCardProps) {
+  const queryArgs = useMemo(
+    () => ({
+      accountIds: selectedAccountIds,
+      monthCount: monthRange,
+    }),
+    [monthRange, selectedAccountIds],
   );
-  const accountById = useMemo(
-    () => new Map(accountOptions.map((account) => [account._id, account])),
-    [accountOptions],
-  );
-  const defaultSelectedAccountIds = useMemo(() => {
-    if (accountOptions.length === 0) {
-      return [];
-    }
-
-    const explicitDefaultId = accountOptions.find(
-      (account) => account.isDefault === true,
-    )?._id;
-
-    if (explicitDefaultId) {
-      return [explicitDefaultId];
-    }
-
-    return [accountOptions[0]._id];
-  }, [accountOptions]);
-  const effectiveSelectedAccountIds = useMemo(() => {
-    if (selectedAccountIds.length === 0) {
-      return defaultSelectedAccountIds;
-    }
-
-    const accountIdSet = new Set(accountIds);
-    const validSelectedIds = selectedAccountIds.filter((accountId) =>
-      accountIdSet.has(accountId),
-    );
-
-    if (validSelectedIds.length === 0) {
-      return defaultSelectedAccountIds;
-    }
-
-    const selectedCurrency = accountById.get(validSelectedIds[0])?.currency;
-
-    if (!selectedCurrency) {
-      return defaultSelectedAccountIds;
-    }
-
-    const sameCurrencyIds = validSelectedIds.filter(
-      (accountId) => accountById.get(accountId)?.currency === selectedCurrency,
-    );
-
-    if (sameCurrencyIds.length === 0) {
-      return defaultSelectedAccountIds;
-    }
-
-    return sameCurrencyIds;
-  }, [
-    accountById,
-    accountIds,
-    defaultSelectedAccountIds,
-    selectedAccountIds,
-  ]);
-  const selectedCurrency =
-    effectiveSelectedAccountIds.length > 0
-      ? accountById.get(effectiveSelectedAccountIds[0])?.currency ?? null
-      : null;
-  const currentCurrencyAccountIds = useMemo(() => {
-    if (!selectedCurrency) {
-      return [];
-    }
-
-    return accountOptions
-      .filter((account) => account.currency === selectedCurrency)
-      .map((account) => account._id);
-  }, [accountOptions, selectedCurrency]);
-  const areAllAccountsSelected =
-    accountOptions.length > 0 &&
-    effectiveSelectedAccountIds.length === currentCurrencyAccountIds.length;
-  const selectedAccountNames = useMemo(
-    () =>
-      accountOptions
-        .filter((account) => effectiveSelectedAccountIds.includes(account._id))
-        .map((account) => account.name),
-    [accountOptions, effectiveSelectedAccountIds],
-  );
-  const selectedAccountsLabel = useMemo(() => {
-    if (accountOptions.length === 0) {
-      return "No accounts";
-    }
-
-    if (areAllAccountsSelected) {
-      return `All ${selectedCurrency ?? ""} accounts`.trim();
-    }
-
-    if (selectedAccountNames.length === 1) {
-      return selectedAccountNames[0];
-    }
-
-    return `${selectedAccountNames.length} accounts`;
-  }, [
-    accountOptions.length,
-    areAllAccountsSelected,
-    selectedAccountNames,
-    selectedCurrency,
-  ]);
-
-  const queryArgs = useMemo(() => {
-    return {
-      accountIds: effectiveSelectedAccountIds,
-    };
-  }, [effectiveSelectedAccountIds]);
   const expenseBreakdown = useQuery(
     api.transactions.expenseBreakdownByCategory,
     queryArgs,
   );
-
-  const onToggleAccount = (accountId: Id<"bankAccounts">) => {
-    setSelectedAccountIds((previous) => {
-      const account = accountById.get(accountId);
-
-      if (!account) {
-        return previous;
-      }
-
-      const baseSelectedIds = (previous.length === 0
-        ? defaultSelectedAccountIds
-        : previous
-      ).filter((selectedId) => accountIds.includes(selectedId));
-
-      if (baseSelectedIds.length === 0) {
-        return defaultSelectedAccountIds;
-      }
-
-      const baseCurrency = accountById.get(baseSelectedIds[0])?.currency;
-      if (baseCurrency && account.currency !== baseCurrency) {
-        return [accountId];
-      }
-
-      const isSelected = baseSelectedIds.includes(accountId);
-
-      if (isSelected) {
-        if (baseSelectedIds.length === 1) {
-          return baseSelectedIds;
-        }
-
-        return baseSelectedIds.filter((selectedId) => selectedId !== accountId);
-      }
-
-      return [...baseSelectedIds, accountId];
-    });
-  };
-
-  const onSelectAllAccounts = () => {
-    setSelectedAccountIds(currentCurrencyAccountIds);
-  };
 
   const chartData = useMemo(() => {
     const rows = expenseBreakdown ?? [];
@@ -221,47 +74,9 @@ export default function ExpenseBreakdownPieCard() {
         <CardTitle>Expenses by category</CardTitle>
         <CardDescription>
           Expense totals are grouped by category using absolute transaction
-          amounts and filtered by selected bank account(s). You can select
-          multiple accounts only when they share the same currency.
+          amounts and filtered by the shared dashboard account and date-range
+          filters.
         </CardDescription>
-        <CardAction>
-          <Menu>
-            <Button render={<MenuTrigger />} size="sm" variant="outline">
-              Accounts: {selectedAccountsLabel}
-            </Button>
-            <MenuPopup align="end">
-              <MenuItem
-                disabled={areAllAccountsSelected || accountOptions.length === 0}
-                onClick={onSelectAllAccounts}
-              >
-                Select all {selectedCurrency ?? ""} accounts
-              </MenuItem>
-              <MenuSeparator />
-              {accountOptions.length === 0 ? (
-                <MenuItem disabled>No bank accounts</MenuItem>
-              ) : (
-                accountOptions.map((account) => {
-                  const isSelected = effectiveSelectedAccountIds.includes(
-                    account._id,
-                  );
-                  const isLastSelected =
-                    isSelected && effectiveSelectedAccountIds.length === 1;
-
-                  return (
-                    <MenuCheckboxItem
-                      checked={isSelected}
-                      disabled={isLastSelected}
-                      key={account._id}
-                      onCheckedChange={() => onToggleAccount(account._id)}
-                    >
-                      {account.name} ({account.currency})
-                    </MenuCheckboxItem>
-                  );
-                })
-              )}
-            </MenuPopup>
-          </Menu>
-        </CardAction>
       </CardHeader>
       <CardContent>
         {expenseBreakdown === undefined ? (

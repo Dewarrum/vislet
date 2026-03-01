@@ -13,6 +13,23 @@ async function requireUserId(ctx: QueryCtx | MutationCtx) {
   return identity.subject;
 }
 
+function getMonthStarts(monthCount: number) {
+  if (!Number.isInteger(monthCount) || monthCount < 1 || monthCount > 24) {
+    throw new Error("Month range must be an integer between 1 and 24");
+  }
+
+  const now = new Date();
+  const monthStarts: Array<number> = [];
+
+  for (let offset = monthCount - 1; offset >= 0; offset -= 1) {
+    monthStarts.push(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - offset, 1),
+    );
+  }
+
+  return monthStarts;
+}
+
 export const listForCurrentUser = query({
   args: {},
   handler: async (ctx) => {
@@ -54,12 +71,17 @@ export const listForCurrentUser = query({
 export const expenseBreakdownByCategory = query({
   args: {
     accountIds: v.optional(v.array(v.id("bankAccounts"))),
+    monthCount: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
     const accountIdFilter = args.accountIds
       ? new Set<Id<"bankAccounts">>(args.accountIds)
       : null;
+    const monthStartFilter =
+      args.monthCount === undefined
+        ? null
+        : new Set<number>(getMonthStarts(args.monthCount));
     const transactions = await ctx.db
       .query("transactions")
       .withIndex("by_userId_and_purchaseDate_createdAt", (q) =>
@@ -79,6 +101,19 @@ export const expenseBreakdownByCategory = query({
 
       if (transaction.amount >= 0) {
         continue;
+      }
+
+      if (monthStartFilter) {
+        const purchaseDate = new Date(transaction.purchaseDate);
+        const monthStart = Date.UTC(
+          purchaseDate.getUTCFullYear(),
+          purchaseDate.getUTCMonth(),
+          1,
+        );
+
+        if (!monthStartFilter.has(monthStart)) {
+          continue;
+        }
       }
 
       const current = totalsByCategory.get(transaction.categoryId) ?? {
@@ -119,6 +154,86 @@ export const expenseBreakdownByCategory = query({
         };
       })
       .sort((a, b) => b.totalAmount - a.totalAmount);
+  },
+});
+
+export const expenseTotalsByMonthLastSixMonths = query({
+  args: {
+    accountIds: v.optional(v.array(v.id("bankAccounts"))),
+    monthCount: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const userId = await requireUserId(ctx);
+    const monthCount = args.monthCount ?? 6;
+
+    const accountIdFilter = args.accountIds
+      ? new Set<Id<"bankAccounts">>(args.accountIds)
+      : null;
+    const monthStarts = getMonthStarts(monthCount);
+
+    const totalsByMonth = new Map<
+      number,
+      { totalAmount: number; transactionCount: number }
+    >(
+      monthStarts.map((monthStart) => [
+        monthStart,
+        { totalAmount: 0, transactionCount: 0 },
+      ]),
+    );
+
+    const transactions = await ctx.db
+      .query("transactions")
+      .withIndex("by_userId_and_purchaseDate_createdAt", (q) =>
+        q.eq("userId", userId),
+      )
+      .collect();
+
+    for (const transaction of transactions) {
+      if (accountIdFilter && !accountIdFilter.has(transaction.accountId)) {
+        continue;
+      }
+
+      if (transaction.amount >= 0) {
+        continue;
+      }
+
+      const purchaseDate = new Date(transaction.purchaseDate);
+      const monthStart = Date.UTC(
+        purchaseDate.getUTCFullYear(),
+        purchaseDate.getUTCMonth(),
+        1,
+      );
+      const current = totalsByMonth.get(monthStart);
+
+      if (!current) {
+        continue;
+      }
+
+      totalsByMonth.set(monthStart, {
+        totalAmount: current.totalAmount + Math.abs(transaction.amount),
+        transactionCount: current.transactionCount + 1,
+      });
+    }
+
+    const monthLabelFormatter = new Intl.DateTimeFormat("en-US", {
+      month: "short",
+      timeZone: "UTC",
+      year: "2-digit",
+    });
+
+    return monthStarts.map((monthStart) => {
+      const totals = totalsByMonth.get(monthStart) ?? {
+        totalAmount: 0,
+        transactionCount: 0,
+      };
+
+      return {
+        monthLabel: monthLabelFormatter.format(monthStart),
+        monthStart,
+        totalAmount: totals.totalAmount,
+        transactionCount: totals.transactionCount,
+      };
+    });
   },
 });
 
