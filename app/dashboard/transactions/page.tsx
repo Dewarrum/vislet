@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Menu, MenuItem, MenuPopup, MenuTrigger } from "@/components/ui/menu";
 import {
   Table,
   TableBody,
@@ -70,6 +71,7 @@ export default function TransactionsPage() {
   const categories = useQuery(api.categories.listForCurrentUser, {});
   const createTransaction = useMutation(api.transactions.create);
   const renameTransaction = useMutation(api.transactions.rename);
+  const changeTransactionType = useMutation(api.transactions.changeType);
   const removeTransaction = useMutation(api.transactions.remove);
 
   const [newAccountId, setNewAccountId] = useState<Id<"bankAccounts"> | "">("");
@@ -83,6 +85,7 @@ export default function TransactionsPage() {
   const [draftNames, setDraftNames] = useState<Record<string, string>>({});
   const [isCreating, setIsCreating] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [switchingTypeId, setSwitchingTypeId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -200,6 +203,28 @@ export default function TransactionsPage() {
       setErrorMessage("Could not delete the transaction. Please try again.");
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const onChangeType = async (
+    transactionId: Id<"transactions">,
+    currentType: TransactionType,
+  ) => {
+    const nextType: TransactionType =
+      currentType === "expense" ? "income" : "expense";
+
+    setSwitchingTypeId(transactionId);
+    setErrorMessage(null);
+
+    try {
+      await changeTransactionType({
+        transactionId,
+        type: nextType,
+      });
+    } catch {
+      setErrorMessage("Could not change the transaction type. Please try again.");
+    } finally {
+      setSwitchingTypeId(null);
     }
   };
 
@@ -328,7 +353,8 @@ export default function TransactionsPage() {
         <CardHeader>
           <CardTitle>Your transactions</CardTitle>
           <CardDescription>
-            You can edit each transaction name and delete any transaction.
+            You can edit names, click a type badge to switch between expense and
+            income, and delete transactions.
           </CardDescription>
         </CardHeader>
 
@@ -356,20 +382,45 @@ export default function TransactionsPage() {
                   const draftName =
                     draftNames[transaction._id] ?? transaction.name;
                   const isSaving = savingId === transaction._id;
+                  const isSwitchingType = switchingTypeId === transaction._id;
                   const isDeleting = deletingId === transaction._id;
                   const isExpense = transaction.amount < 0;
+                  const currentType: TransactionType = isExpense
+                    ? "expense"
+                    : "income";
+                  const nextTypeLabel = isExpense ? "Income" : "Expense";
                   const canSave =
                     draftName.trim().length > 0 &&
                     draftName.trim() !== transaction.name &&
                     !isSaving &&
-                    !isDeleting;
+                    !isDeleting &&
+                    !isSwitchingType;
 
                   return (
                     <TableRow key={transaction._id}>
                       <TableCell>
-                        <Badge size="sm" variant={isExpense ? "error" : "success"}>
-                          {isExpense ? "Expense" : "Income"}
-                        </Badge>
+                        <Menu>
+                          <MenuTrigger className="inline-flex cursor-pointer appearance-none rounded-sm border-0 bg-transparent p-0 text-inherit outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background">
+                            <Badge
+                              size="sm"
+                              variant={isExpense ? "error" : "success"}
+                            >
+                              {isExpense ? "Expense" : "Income"}
+                            </Badge>
+                          </MenuTrigger>
+                          <MenuPopup align="start">
+                            <MenuItem
+                              disabled={isSwitchingType || isSaving || isDeleting}
+                              onClick={() =>
+                                onChangeType(transaction._id, currentType)
+                              }
+                            >
+                              {isSwitchingType
+                                ? "Switching..."
+                                : `Switch to ${nextTypeLabel}`}
+                            </MenuItem>
+                          </MenuPopup>
+                        </Menu>
                       </TableCell>
                       <TableCell>
                         {formatAmount(
@@ -408,7 +459,7 @@ export default function TransactionsPage() {
                             {isSaving ? "Saving..." : "Save name"}
                           </Button>
                           <Button
-                            disabled={isDeleting || isSaving}
+                            disabled={isDeleting || isSaving || isSwitchingType}
                             onClick={() =>
                               onDelete(transaction._id, transaction.name)
                             }

@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 
 async function requireUserId(ctx: QueryCtx | MutationCtx) {
@@ -47,6 +48,77 @@ export const listForCurrentUser = query({
         };
       }),
     );
+  },
+});
+
+export const expenseBreakdownByCategory = query({
+  args: {
+    accountIds: v.optional(v.array(v.id("bankAccounts"))),
+  },
+  handler: async (ctx, args) => {
+    const userId = await requireUserId(ctx);
+    const accountIdFilter = args.accountIds
+      ? new Set<Id<"bankAccounts">>(args.accountIds)
+      : null;
+    const transactions = await ctx.db
+      .query("transactions")
+      .withIndex("by_userId_and_purchaseDate_createdAt", (q) =>
+        q.eq("userId", userId),
+      )
+      .collect();
+
+    const totalsByCategory = new Map<
+      Id<"categories">,
+      { totalAmount: number; transactionCount: number }
+    >();
+
+    for (const transaction of transactions) {
+      if (accountIdFilter && !accountIdFilter.has(transaction.accountId)) {
+        continue;
+      }
+
+      if (transaction.amount >= 0) {
+        continue;
+      }
+
+      const current = totalsByCategory.get(transaction.categoryId) ?? {
+        totalAmount: 0,
+        transactionCount: 0,
+      };
+
+      totalsByCategory.set(transaction.categoryId, {
+        totalAmount: current.totalAmount + Math.abs(transaction.amount),
+        transactionCount: current.transactionCount + 1,
+      });
+    }
+
+    const categoryIds = Array.from(totalsByCategory.keys());
+    const categories = await Promise.all(
+      categoryIds.map((categoryId) => ctx.db.get(categoryId)),
+    );
+    const categoryNameById = new Map(
+      categoryIds.map((categoryId, index) => [
+        categoryId,
+        categories[index]?.name ?? "Unknown category",
+      ]),
+    );
+
+    return categoryIds
+      .map((categoryId) => {
+        const totals = totalsByCategory.get(categoryId);
+
+        if (!totals) {
+          throw new Error("Missing expense totals for category");
+        }
+
+        return {
+          categoryId,
+          categoryName: categoryNameById.get(categoryId) ?? "Unknown category",
+          totalAmount: totals.totalAmount,
+          transactionCount: totals.transactionCount,
+        };
+      })
+      .sort((a, b) => b.totalAmount - a.totalAmount);
   },
 });
 
@@ -133,6 +205,39 @@ export const rename = mutation({
     await ctx.db.patch(args.transactionId, {
       name,
     });
+  },
+});
+
+export const changeType = mutation({
+  args: {
+    transactionId: v.id("transactions"),
+    type: v.union(v.literal("expense"), v.literal("income")),
+  },
+  handler: async (ctx, args) => {
+    const userId = await requireUserId(ctx);
+    const transaction = await ctx.db.get(args.transactionId);
+
+    if (!transaction) {
+      throw new Error("Transaction not found");
+    }
+
+    if (transaction.userId !== userId) {
+      throw new Error("Unauthorized");
+    }
+
+    const absoluteAmount = Math.abs(transaction.amount);
+    const nextAmount =
+      args.type === "income" ? absoluteAmount : -absoluteAmount;
+
+    if (transaction.amount === nextAmount) {
+      return null;
+    }
+
+    await ctx.db.patch(args.transactionId, {
+      amount: nextAmount,
+    });
+
+    return null;
   },
 });
 

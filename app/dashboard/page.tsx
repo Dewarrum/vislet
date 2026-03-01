@@ -1,4 +1,5 @@
 import Link from "next/link";
+import ExpenseBreakdownPieCard from "@/components/expense-breakdown-pie-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -8,6 +9,7 @@ export default function DashboardPage() {
       <h1 className="text-3xl font-semibold tracking-tight text-slate-900">
         Dashboard overview
       </h1>
+      <ExpenseBreakdownPieCard />
       <Card>
         <CardHeader>
           <CardTitle>Bank accounts</CardTitle>
